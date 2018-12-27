@@ -1,3 +1,4 @@
 local_data.py
 .env
 .vscode
+.cache*

@@ -7,6 +7,7 @@ from datetime import datetime
 from datetime import timedelta
 import pickle
 import local_data
+import urllib
 
 
 class Auth:
@@ -79,7 +80,7 @@ class Auth:
             response_type="code",
             redirect_uri=self.REDIRECT_URI,
             scope=" ".join(self.scopes),
-            show_dialog=True
+            show_dialog=True,
         )
 
         url = requests.Request("GET", api_url, params=params).prepare().url
@@ -140,23 +141,63 @@ class Auth:
     def get_playlists(self, user_id):
         api_url = "https://api.spotify.com/v1/users/{}/playlists".format(user_id)
 
-        return requests.get(api_url, headers=self._get_auth_header()).json()
+        return requests.get(
+            api_url, params=dict(limit=50), headers=self._get_auth_header()
+        ).json()
 
     def get_or_create_playlist(self, user_id, playlist_name):
         playlists = self.get_playlists(user_id)
 
         for playlist in playlists["items"]:
-            print(playlist["name"])
             if playlist["name"] == playlist_name:
                 return playlist
 
-        #return self.create_playlist(user_id, playlist_name)
+        return self.create_playlist(user_id, playlist_name)
 
+    def insert_track(self, playlist_id, track_ids):
+        api_url = "https://api.spotify.com/v1/playlists/{}/tracks".format(playlist_id)
+
+        data = dict(uris=track_ids)
+
+        playlist_details = requests.post(
+            api_url, json=data, headers=self._get_auth_header()
+        ).json()
+
+        return playlist_details
+    
+    def search_album(self, artist, album):
+        api_url = "https://api.spotify.com/v1/search"
+
+        query = "album:{} artist:{}".format(album, artist)
+        params = dict(q=query, type="album")
+
+        return requests.get(
+            api_url, params=params, headers=self._get_auth_header()
+        ).json()
+        
 
 def main():
-    auth = Auth(["playlist-modify-private"])
+    scopes = [
+        "user-read-private",
+        "playlist-read-private",
+        "playlist-modify-public",
+        "playlist-modify-private"
+    ]
+    auth = Auth(scopes)
+
     user_id = auth.get_user_id()
-    auth.get_or_create_playlist(user_id, "Essential heavy")
+
+    playlist = auth.get_or_create_playlist(user_id, "FactMag Playlist")
+    playlist_id = playlist["id"]
+
+    # track_ids = ["spotify:track:4iV5W9uYEdYUVa79Axb7Rh"]
+    # print(auth.insert_track(playlist_id, track_ids))
+
+    albums = auth.search_album("michael jackson", "thriller")
+    print(albums["albums"]["items"][0]["id"])
+
+    # GET https://api.spotify.com/v1/albums/{id}
+    # -> all tracks are in there...
 
 
 if __name__ == "__main__":
